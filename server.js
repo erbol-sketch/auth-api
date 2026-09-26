@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,6 +14,106 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_change_in_pro
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// --- OpenAPI / Swagger Specification ---
+const swaggerSpec = {
+  openapi: '3.0.0',
+  info: {
+    title: 'Express MongoDB Auth API',
+    version: '1.0.0',
+    description: 'API авторизации с логином, регистрацией и эндпоинтом /api/me (JWT + MongoDB)',
+  },
+  servers: [
+    {
+      url: '/',
+      description: 'Current Server Host'
+    }
+  ],
+  components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Введите токен JWT, полученный при регистрации или входе (без слова Bearer)'
+      }
+    }
+  },
+  paths: {
+    '/': {
+      get: {
+        summary: 'Health Check / Status',
+        responses: {
+          '200': { description: 'API status online' }
+        }
+      }
+    },
+    '/api/register': {
+      post: {
+        summary: 'Регистрация нового пользователя',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name', 'email', 'password'],
+                properties: {
+                  name: { type: 'string', example: 'Иван Иванов' },
+                  email: { type: 'string', example: 'user@example.com' },
+                  password: { type: 'string', example: 'password123' }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          '201': { description: 'Пользователь успешно зарегистрирован' },
+          '400': { description: 'Ошибка валидации или пользователь уже существует' }
+        }
+      }
+    },
+    '/api/login': {
+      post: {
+        summary: 'Вход пользователя и получение JWT токена',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email', 'password'],
+                properties: {
+                  email: { type: 'string', example: 'user@example.com' },
+                  password: { type: 'string', example: 'password123' }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          '200': { description: 'Успешный вход, возвращает токен JWT' },
+          '400': { description: 'Неверный email или пароль' }
+        }
+      }
+    },
+    '/api/me': {
+      get: {
+        summary: 'Получение профиля текущего пользователя',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '200': { description: 'Данные авторизованного пользователя' },
+          '401': { description: 'Токен отсутствует' },
+          '403': { description: 'Недействительный или истекший токен' }
+        }
+      }
+    }
+  }
+};
+
+// Swagger UI Route
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/swagger', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // --- MongoDB Database Connection ---
 mongoose.connect(MONGO_URI)
@@ -71,7 +172,9 @@ app.get('/', (req, res) => {
   res.json({
     status: 'online',
     message: 'Express + MongoDB Auth API is running',
+    swaggerUi: '/api-docs',
     endpoints: {
+      swagger: 'GET /api-docs',
       register: 'POST /api/register',
       login: 'POST /api/login',
       me: 'GET /api/me (Requires Authorization: Bearer <token>)'
@@ -183,4 +286,5 @@ app.use((req, res) => {
 // Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`📑 Swagger Documentation available at http://localhost:${PORT}/api-docs`);
 });
