@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: express-mongo-auth-api
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
